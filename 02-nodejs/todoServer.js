@@ -39,11 +39,111 @@
 
   Testing the server - run `npm run test-todoServer` command in terminal
  */
-const express = require('express');
-const bodyParser = require('body-parser');
+const express = require("express");
+const bodyParser = require("body-parser");
+const path = require("path");
+const fs = require("fs");
+const { timeLog } = require("console");
 
 const app = express();
-
+const filePath = path.join(__dirname, "todos.txt");
 app.use(bodyParser.json());
+
+function generateRandomNumber() {
+  const min = 10000;
+  const max = 99999;
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function readJsonArraySync(filePath) {
+  data = fs.readFileSync(filePath, "utf-8");
+  jsonArray = data ? JSON.parse(data) : [];
+  return jsonArray;
+}
+
+function sendStatus(found, res) {
+  if (found) {
+    return res.status(200).send("OK");
+  } else {
+    return res.status(404).send("Not Found");
+  }
+}
+
+app.get("/todos", (req, res) => {
+  return res.status(200).send(readJsonArraySync(filePath));
+});
+
+app.get("/todos/:id", (req, res) => {
+  const jsonArray = readJsonArraySync(filePath);
+  const id = parseInt(req.params.id);
+  let found = false;
+  let index = 0;
+
+  for (let i = 0; i < jsonArray.length; i++) {
+    if (id === jsonArray[i].id) {
+      found = true;
+      index = i;
+    }
+    break;
+  }
+
+  if (found) {
+    return res.status(200).send(jsonArray[index]);
+  } else {
+    return res.status(404).send("Not Found");
+  }
+});
+
+app.post("/todos", (req, res) => {
+  const todo = {
+    title: req.body.title,
+    description: req.body.description,
+    id: generateRandomNumber(),
+  };
+
+  const jsonArray = readJsonArraySync(filePath);
+  jsonArray.push(todo);
+
+  fs.writeFileSync(filePath, JSON.stringify(jsonArray));
+  return res.status(201).send({ id: todo.id });
+});
+
+app.put("/todos/:id", (req, res) => {
+  const jsonArray = readJsonArraySync(filePath);
+  const id = parseInt(req.params.id);
+  let found = false;
+
+  for (let i = 0; i < jsonArray.length; i++) {
+    if (jsonArray[i].id === id) {
+      found = true;
+      jsonArray[i].title = req.body.title;
+      jsonArray[i].description = req.body.description;
+
+      fs.writeFileSync(filePath, JSON.stringify(jsonArray));
+      break;
+    }
+  }
+  sendStatus(found, res);
+});
+
+app.delete("/todos/:id", (req, res) => {
+  const jsonArray = readJsonArraySync(filePath);
+  const id = parseInt(req.params.id);
+  let found = false;
+
+  for (let i = 0; i < jsonArray.length; i++) {
+    if (jsonArray[i].id === id) {
+      found = true;
+      jsonArray.splice(i, 1);
+      fs.writeFileSync(filePath, JSON.stringify(jsonArray));
+      break;
+    }
+  }
+  sendStatus(found, res);
+});
+
+app.listen(3000, () => {
+  console.log("listening on port 3000");
+});
 
 module.exports = app;
